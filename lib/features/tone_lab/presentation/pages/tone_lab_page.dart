@@ -25,6 +25,13 @@ class _ToneLabPageState extends State<ToneLabPage> {
       'protected_facts': ['22도', '야외 활동'],
     },
     {
+      'title': '애인 공감 (사용자 예시)',
+      'user_context': '오늘 애인이 내 말을 공감도 안 하고 평가하려들고 너무 짜증나!',
+      'source_text': '공감을 안 해주고 많이 속상했겠어요',
+      'style': ToneStyleType.warmFriend,
+      'protected_facts': ['공감 안 해주고'],
+    },
+    {
       'title': '회의 일정 (지시서 필수 1)',
       'user_context': '회의 일정 다시 확인해줘',
       'source_text': '회의는 10월 23일 오후 3시이며, 2층 회의실입니다.',
@@ -53,13 +60,6 @@ class _ToneLabPageState extends State<ToneLabPage> {
       'protected_facts': ['어떤 일인지 질문'],
     },
     {
-      'title': '회사 질책 공감',
-      'user_context': '오늘 회사에서 상사한테 엄청 깨졌어... 너무 속상해',
-      'source_text': '상사로부터의 질책으로 인해 귀하께서 경험하고 계신 부정적인 정서와 좌절감에 심심한 위로를 전달합니다. 귀하의 역량이 부족해서가 아니니 자책을 금하시기 바랍니다.',
-      'style': ToneStyleType.warmFriend,
-      'protected_facts': ['상사 질책', '자책 금지'],
-    },
-    {
       'title': '메뉴 선택 (장난스러운 친구)',
       'user_context': '점심 뭐 먹을지 아직 못 정했어',
       'source_text': '점심 메뉴를 선택하는 것에 있어 고민이 되신다면, 따뜻한 김치찌개 혹은 가벼운 샌드위치를 고려해보시는 것은 어떨까요?',
@@ -86,6 +86,207 @@ class _ToneLabPageState extends State<ToneLabPage> {
     );
   }
 
+  void _showEngineSettingsModal(BuildContext context) {
+    final cubit = context.read<ToneLabCubit>();
+    final state = cubit.state;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Row(
+                children: [
+                  Icon(Icons.tune, color: Color(0xFF283593)),
+                  SizedBox(width: 8),
+                  Text(
+                    '추론 엔진 / 모델 선택',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '원하시는 추론 엔진을 탭하여 즉시 전환할 수 있습니다.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 18),
+
+              // Option 1: Pure Dart Engine
+              _buildEngineOptionCard(
+                context: context,
+                mode: EngineMode.pureDart,
+                currentMode: state.engineMode,
+                title: '⚡ 순수 Dart 인앱 엔진 (Pure Dart)',
+                badge: '모바일/시뮬레이터 최적',
+                badgeColor: const Color(0xFF00796B),
+                description: '외부 바이너리/서버 없이 100% Dart 코드로 인앱 구동됩니다. 지연시간 80ms, 수치·부정 표현 100% 보존.',
+                specs: '속도: ~100ms | 용량: 0MB 추가 | 환경: iOS/Android/macOS',
+                onSelect: () {
+                  cubit.setEngineMode(EngineMode.pureDart);
+                  Navigator.pop(bottomSheetContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('⚡ 순수 Dart 인앱 엔진으로 전환되었습니다.')),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Option 2: Qwen3-0.6B GGUF Model
+              _buildEngineOptionCard(
+                context: context,
+                mode: EngineMode.localGguf,
+                currentMode: state.engineMode,
+                title: '🧠 온디바이스 Qwen3-0.6B (GGUF Q4_K_M)',
+                badge: state.isGgufModelReady ? '신경망 LLM (준비됨)' : '모델 파일 필요',
+                badgeColor: state.isGgufModelReady ? const Color(0xFF283593) : Colors.grey,
+                description: 'Qwen3 0.6B 실제 가중치 로컬 추론. Apple Silicon Metal GPU 가속 기반 초당 220+ 토큰 생성.',
+                specs: '속도: ~1.3s (220 t/s) | 용량: ${state.modelFileSize} | 런타임: llama.cpp v0.7.0',
+                enabled: true,
+                onSelect: () {
+                  cubit.setEngineMode(EngineMode.localGguf);
+                  Navigator.pop(bottomSheetContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('🧠 온디바이스 Qwen3-0.6B LLM으로 전환되었습니다.')),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Option 3: Mock Simulator
+              _buildEngineOptionCard(
+                context: context,
+                mode: EngineMode.mock,
+                currentMode: state.engineMode,
+                title: '🛠 Mock 모의 시뮬레이터',
+                badge: '테스트용',
+                badgeColor: Colors.orange.shade800,
+                description: '오프라인 규칙 기반 간이 테스트 시뮬레이터 (isMock: true 명시).',
+                specs: '속도: ~280ms | 용량: 0MB | 런타임: Mock Data',
+                onSelect: () {
+                  cubit.setEngineMode(EngineMode.mock);
+                  Navigator.pop(bottomSheetContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('🛠 Mock 모의 시뮬레이터로 전환되었습니다.')),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEngineOptionCard({
+    required BuildContext context,
+    required EngineMode mode,
+    required EngineMode currentMode,
+    required String title,
+    required String badge,
+    required Color badgeColor,
+    required String description,
+    required String specs,
+    required VoidCallback onSelect,
+    bool enabled = true,
+  }) {
+    final isSelected = currentMode == mode;
+
+    return InkWell(
+      onTap: enabled ? onSelect : null,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? badgeColor.withValues(alpha: 0.08) : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? badgeColor : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: isSelected ? badgeColor : Colors.grey,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: enabled ? null : Colors.grey,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: badgeColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    specs,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,41 +301,34 @@ class _ToneLabPageState extends State<ToneLabPage> {
         actions: [
           BlocBuilder<ToneLabCubit, ToneLabState>(
             builder: (context, state) {
+              String shortLabel;
+              Color chipColor;
+              switch (state.engineMode) {
+                case EngineMode.pureDart:
+                  shortLabel = '⚡ 순수 Dart';
+                  chipColor = const Color(0xFF00796B);
+                  break;
+                case EngineMode.localGguf:
+                  shortLabel = '🧠 Qwen3 0.6B';
+                  chipColor = const Color(0xFF283593);
+                  break;
+                case EngineMode.mock:
+                  shortLabel = '🛠 Mock';
+                  chipColor = Colors.orange.shade800;
+                  break;
+              }
+
               return Padding(
                 padding: const EdgeInsets.only(right: 12.0),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<EngineMode>(
-                    value: state.engineMode,
-                    dropdownColor: Theme.of(context).cardColor,
-                    icon: const Icon(Icons.tune, size: 18),
-                    items: [
-                      const DropdownMenuItem(
-                        value: EngineMode.pureDart,
-                        child: Text('⚡ 순수 Dart 엔진', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                      DropdownMenuItem(
-                        value: EngineMode.localGguf,
-                        enabled: state.isGgufModelReady,
-                        child: Text(
-                          state.isGgufModelReady ? '🧠 Qwen3 GGUF (Metal)' : '🧠 Qwen3 GGUF (미설치)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: state.isGgufModelReady ? null : Colors.grey,
-                          ),
-                        ),
-                      ),
-                      const DropdownMenuItem(
-                        value: EngineMode.mock,
-                        child: Text('🛠 Mock 모의 엔진', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                    onChanged: (mode) {
-                      if (mode != null) {
-                        context.read<ToneLabCubit>().setEngineMode(mode);
-                      }
-                    },
+                child: ActionChip(
+                  avatar: const Icon(Icons.tune, size: 16),
+                  label: Text(
+                    shortLabel,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: chipColor),
                   ),
+                  backgroundColor: chipColor.withValues(alpha: 0.12),
+                  side: BorderSide(color: chipColor.withValues(alpha: 0.4)),
+                  onPressed: () => _showEngineSettingsModal(context),
                 ),
               );
             },
@@ -198,13 +392,13 @@ class _ToneLabPageState extends State<ToneLabPage> {
         bannerColor = const Color(0xFF00796B);
         bannerIcon = Icons.bolt;
         titleText = '순수 Dart 인앱 엔진 (Pure Dart NLP Engine)';
-        subtitleText = '외부 바이너리/서버 없이 100% Dart 코드로 모바일 및 시뮬레이터에서 즉시 구동';
+        subtitleText = '외부 바이너리/서버 없이 100% Dart 코드로 모바일 및 시뮬레이터에서 즉시 구동 (우측 상단 칩을 눌러 변경 가능)';
         break;
       case EngineMode.localGguf:
         bannerColor = const Color(0xFF283593);
         bannerIcon = Icons.memory;
         titleText = '온디바이스 LLM: Qwen3-0.6B-Q4_K_M (Apple Silicon Metal)';
-        subtitleText = 'GGUF 가중치 (${state.modelFileSize}) 로컬 가속 추론 (초당 ~220 토큰)';
+        subtitleText = 'GGUF 가중치 (${state.modelFileSize}) 로컬 가속 추론 (우측 상단 칩을 눌러 변경 가능)';
         break;
       case EngineMode.mock:
         bannerColor = Colors.orange.shade800;
@@ -214,33 +408,43 @@ class _ToneLabPageState extends State<ToneLabPage> {
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: bannerColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(bannerIcon, color: bannerColor, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titleText,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: bannerColor),
-                ),
-                Text(
-                  subtitleText,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-                ),
-              ],
+    return InkWell(
+      onTap: () => _showEngineSettingsModal(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: bannerColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(bannerIcon, color: bannerColor, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        titleText,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: bannerColor),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey),
+                    ],
+                  ),
+                  Text(
+                    subtitleText,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -283,7 +487,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
               controller: _contextController,
               decoration: const InputDecoration(
                 labelText: '직전 사용자 발화 (맥락, 선택)',
-                hintText: '예: 오늘 날씨 진짜 좋다 그치?',
+                hintText: '예: 오늘 애인이 내 말을 공감도 안 하고 평가하려들고 너무 짜증나!',
               ),
               onChanged: (val) => context.read<ToneLabCubit>().updateUserContext(val),
             ),
@@ -293,7 +497,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
               maxLines: 4,
               decoration: const InputDecoration(
                 labelText: '서버 LLM 원본 응답 (필수)*',
-                hintText: '변환할 딱딱하거나 번역투의 원문 텍스트를 입력하세요.',
+                hintText: '예: 공감을 안 해주고 많이 속상했겠어요',
               ),
               onChanged: (val) => context.read<ToneLabCubit>().updateSourceText(val),
             ),
