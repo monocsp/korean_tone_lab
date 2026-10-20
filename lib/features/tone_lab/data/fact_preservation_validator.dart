@@ -66,8 +66,27 @@ class FactPreservationValidator {
       }
     }
 
-    // 4. Protected Facts Check (numbers, key entities)
+    // 4. Automatic extraction of numbers in sourceText
+    final numberPattern = RegExp(r'\d+(?:[.,]\d+)?');
+    final sourceNumbers = numberPattern.allMatches(sourceText).map((m) => m.group(0)!).toSet();
+    final rewrittenNumbers = numberPattern.allMatches(rewrittenText).map((m) => m.group(0)!).toSet();
+
+    for (final num in sourceNumbers) {
+      if (!rewrittenNumbers.contains(num)) {
+        flags.add('MISSING_PROTECTED_NUMBER($num)');
+        isValid = false;
+      }
+    }
+
+    // 5. Explicit Protected Facts Check
+    // IMPORTANT: Only check facts that ACTUALLY exist in the sourceText!
+    // This prevents stale preset facts from falsely flagging user-typed texts.
     for (final fact in protectedFacts) {
+      if (!sourceText.contains(fact)) {
+        // Skip facts that don't even exist in the user's current input
+        continue;
+      }
+
       final tokens = RegExp(r'\w+').allMatches(fact).map((m) => m.group(0)!).toList();
       final found = tokens.any((tok) => tok.length >= 2 && rewrittenText.contains(tok));
       if (!found && fact.contains(RegExp(r'\d'))) {
@@ -76,7 +95,7 @@ class FactPreservationValidator {
       }
     }
 
-    // 5. Negation polarity preservation
+    // 6. Negation polarity preservation
     final sourceHasNegation = _negationPatterns.any((pat) => pat.hasMatch(sourceText));
     final rewrittenHasNegation = _negationPatterns.any((pat) => pat.hasMatch(rewrittenText));
     if (sourceHasNegation && !rewrittenHasNegation) {
@@ -84,7 +103,7 @@ class FactPreservationValidator {
       isValid = false;
     }
 
-    // 6. Question intent check
+    // 7. Question intent check
     final sourceIsQuestion = sourceText.contains('?') ||
         sourceText.endsWith('나요') ||
         sourceText.endsWith('가요') ||
@@ -97,7 +116,6 @@ class FactPreservationValidator {
         rewrittenText.endsWith('나?');
     if (sourceIsQuestion && !rewrittenIsQuestion) {
       flags.add('QUESTION_INTENT_DROPPED');
-      // Warning flag
     }
 
     return ValidationResult(

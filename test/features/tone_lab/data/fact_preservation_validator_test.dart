@@ -26,10 +26,21 @@ void main() {
         protectedFacts: ['10월 23일', '오후 3시'],
       );
       expect(res.isValid, isFalse);
-      expect(res.flags.any((f) => f.contains('MISSING_PROTECTED_FACT')), isTrue);
+      expect(res.flags.any((f) => f.contains('MISSING_PROTECTED_NUMBER') || f.contains('MISSING_PROTECTED_FACT')), isTrue);
     });
 
-    test('3. Negation polarity inverted triggers invalid flag', () {
+    test('3. Stale facts not present in sourceText are safely skipped (prevent false positives)', () {
+      // User typed "내일 밥 먹자" but state still had leftover ['22도', '야외 활동'] from previous preset
+      final res = validator.validate(
+        '내일 밥 같이 먹자.',
+        '내일 밥 같이 먹자!',
+        protectedFacts: ['22도', '야외 활동'], // Stale facts from prior preset
+      );
+      expect(res.isValid, isTrue);
+      expect(res.flags, isEmpty);
+    });
+
+    test('4. Negation polarity inverted triggers invalid flag', () {
       final res = validator.validate(
         '오늘은 연락하지 않아도 괜찮아.',
         '오늘은 연락해야 해.',
@@ -38,13 +49,13 @@ void main() {
       expect(res.flags, contains('NEGATION_POLARITY_INVERTED'));
     });
 
-    test('4. Empty output triggers invalid flag', () {
+    test('5. Empty output triggers invalid flag', () {
       final res = validator.validate('원문 내용', '   ');
       expect(res.isValid, isFalse);
       expect(res.flags, contains('EMPTY_OUTPUT'));
     });
 
-    test('5. Leaked <think> tag triggers invalid flag', () {
+    test('6. Leaked <think> tag triggers invalid flag', () {
       final res = validator.validate(
         '안녕하세요.',
         '<think>사용자가 인사를 건넸다.</think>반가워!',

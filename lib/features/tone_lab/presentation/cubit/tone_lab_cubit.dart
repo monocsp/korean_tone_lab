@@ -51,8 +51,20 @@ class ToneLabCubit extends Cubit<ToneLabState> {
     }
   }
 
+  /// Automatically extracts numeric and temporal entities from user input text.
+  List<String> _extractFacts(String text) {
+    final pattern = RegExp(r'\d+(?:[.,]\d+)?(?:월|일|시|분|초|도|원|명|회|개|층|번|잔|권|%|kg|m|km)?');
+    return pattern.allMatches(text).map((m) => m.group(0)!).toSet().toList();
+  }
+
   void updateSourceText(String text) {
-    emit(state.copyWith(sourceText: text));
+    // When user manually types, dynamically extract facts from their actual input
+    final dynamicFacts = _extractFacts(text);
+    emit(state.copyWith(
+      sourceText: text,
+      protectedFacts: dynamicFacts,
+      errorMessage: null,
+    ));
   }
 
   void updateUserContext(String context) {
@@ -78,6 +90,7 @@ class ToneLabCubit extends Cubit<ToneLabState> {
       sourceText: sourceText,
       selectedStyle: style,
       protectedFacts: protectedFacts,
+      errorMessage: null,
     ));
   }
 
