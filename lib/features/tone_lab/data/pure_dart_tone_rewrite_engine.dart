@@ -77,7 +77,24 @@ class PureDartToneRewriteEngine {
     res = res.replaceAll('온화한 날씨 패턴을 보이고 있습니다', '날씨가 참 포근해');
     res = res.replaceAll('적합한 날씨로 판단됩니다', '활동하기 딱 좋은 날씨야');
 
-    // 3. Question form conversion while strictly preserving question intent
+    // 3. Empathy and Speculative Endings (~겠어요, ~했겠어요)
+    res = res.replaceAll('속상하셨겠어요', '속상했겠다');
+    res = res.replaceAll('속상했겠어요', '속상했겠다');
+    res = res.replaceAll('힘드셨겠어요', '힘들었겠다');
+    res = res.replaceAll('힘들었겠어요', '힘들었겠다');
+    res = res.replaceAll('답답하셨겠어요', '답답했겠다');
+    res = res.replaceAll('답답했겠어요', '답답했겠다');
+    res = res.replaceAll('짜증나셨겠어요', '짜증났겠다');
+    res = res.replaceAll('짜증났겠어요', '짜증났겠다');
+    res = res.replaceAll('하셨겠어요', '했겠다');
+    res = res.replaceAll('했겠어요', '했겠다');
+    res = res.replaceAll('셨겠어요', '했겠다');
+    res = res.replaceAll('겠어요', '겠다');
+    res = res.replaceAll('하셨겠네요', '했겠네');
+    res = res.replaceAll('했겠네요', '했겠네');
+    res = res.replaceAll('겠네요', '겠네');
+
+    // 4. Question form conversion while strictly preserving question intent
     res = res.replaceAll('어떤 일이 있었나요?', '무슨 일 있었어? 편하게 이야기해줘.');
     res = res.replaceAll('어느 부위에 통증이 발생하고 있습니까?', '정확히 어디가 아픈 거야?');
     res = res.replaceAll('어떨까요?', '어때?');
@@ -90,7 +107,7 @@ class PureDartToneRewriteEngine {
     res = res.replaceAll('습니까?', '어?');
     res = res.replaceAll('십니까?', '셔?');
 
-    // 4. Strict Negation Preservation (Do not invert polarity!)
+    // 5. Strict Negation Preservation (Do not invert polarity!)
     res = res.replaceAll('연락하지 않아도 괜찮아.', '연락하지 않아도 괜찮아! 편하게 쉬어.');
     res = res.replaceAll('확신할 수는 없습니다.', '확신할 수는 없어.');
     res = res.replaceAll('드시면 안 됩니다', '먹으면 절대 안 돼');
@@ -102,7 +119,7 @@ class PureDartToneRewriteEngine {
     res = res.replaceAll('아닙니다', '아니야');
     res = res.replaceAll('못합니다', '못해');
 
-    // 5. Generalized Verb & Adjective Endings to Friendly Informal
+    // 6. Generalized Verb & Adjective Endings to Friendly Informal
     res = res.replaceAll('하십시오', '해봐');
     res = res.replaceAll('하십시요', '해봐');
     res = res.replaceAll('하세요', '해봐');
@@ -125,7 +142,7 @@ class PureDartToneRewriteEngine {
     res = res.replaceAll('처리됩니다', '처리돼');
     res = res.replaceAll('유지됩니다', '유지돼');
 
-    // 6. Polite '-요' to Informal (generalized ending conversion)
+    // 7. Polite '-요' to Informal (generalized ending conversion)
     res = res.replaceAll(RegExp(r'있어요\b'), '있어');
     res = res.replaceAll(RegExp(r'없어요\b'), '없어');
     res = res.replaceAll(RegExp(r'같아요\b'), '같아');
@@ -135,12 +152,12 @@ class PureDartToneRewriteEngine {
     res = res.replaceAll(RegExp(r'봐요\b'), '봐');
     res = res.replaceAll(RegExp(r'줘요\b'), '줘');
 
-    // 7. Formal '-니다' sentence endings conversion
+    // 8. Formal '-니다' sentence endings conversion
     res = res.replaceAll(RegExp(r'습니다\.(?!\S)'), '어.');
     res = res.replaceAll(RegExp(r'합니다\.(?!\S)'), '해.');
     res = res.replaceAll(RegExp(r'됩니다\.(?!\S)'), '돼.');
 
-    // 8. Handle noun + '입니다.' -> '이야.' or '야.' depending on batchim
+    // 9. Handle noun + '입니다.' -> '이야.' or '야.' depending on batchim
     res = res.replaceAllMapped(RegExp(r'([가-힣])입니다\.(?!\S)'), (match) {
       final prevChar = match.group(1)!;
       final ending = hasBatchim(prevChar) ? '이야.' : '야.';
@@ -163,8 +180,14 @@ class PureDartToneRewriteEngine {
     if (res.contains('커피를 과도하게 3잔이나 섭취하시는 것은')) {
       return '벌써 커피를 3잔이나 마셨다고? 그러다 오늘 밤에 눈 말똥말똥 잠 못 잔다! ☕';
     }
+    if (res.contains('속상했겠어요') || res.contains('속상하셨겠어요')) {
+      return '공감도 안 해주고 평가질이라니 진짜 속상했겠다! 완전 어이없네.';
+    }
 
     // General playful conversions
+    res = res.replaceAll('속상했겠어요', '속상했겠다!');
+    res = res.replaceAll('했겠어요', '했겠다');
+    res = res.replaceAll('겠어요', '겠다');
     res = res.replaceAll('하십시오', '해보라구');
     res = res.replaceAll('바랍니다', '좋겠는데?');
     res = res.replaceAll('권고드립니다', '강추한다!');
