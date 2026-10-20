@@ -1,24 +1,27 @@
 name: korean_tone_lab
-description: "On-device Korean Naturalization and Character Tone Rewriter PoC"
+description: "On-device Korean naturalization and character tone rewriting Flutter PoC app."
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.0
+  sdk: ^3.6.0
 
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_bloc: ^9.1.1
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
+
   assets:
-    - assets/styles/
-    - datasets/eval_cases.jsonl
+    - assets/styles/natural_korean.json
+    - assets/styles/warm_friend.json
+    - assets/styles/playful_friend.json

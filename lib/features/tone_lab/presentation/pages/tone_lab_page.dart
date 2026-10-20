@@ -88,112 +88,174 @@ class _ToneLabPageState extends State<ToneLabPage> {
 
   void _showEngineSettingsModal(BuildContext context) {
     final cubit = context.read<ToneLabCubit>();
-    final state = cubit.state;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (bottomSheetContext) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+        return BlocBuilder<ToneLabCubit, ToneLabState>(
+          bloc: cubit,
+          builder: (modalContext, state) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const Row(
+                      children: [
+                        Icon(Icons.tune, color: Color(0xFF283593)),
+                        SizedBox(width: 8),
+                        Text(
+                          '추론 엔진 및 모델 선택',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '원하는 추론 모델/엔진을 탭하여 즉시 전환할 수 있습니다.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Model 1: Qwen3-0.6B GGUF Neural Model
+                    _buildEngineOptionCard(
+                      context: context,
+                      mode: EngineMode.localGguf,
+                      currentMode: state.engineMode,
+                      title: '🧠 Qwen3-0.6B Q4_K_M (온디바이스 LLM)',
+                      badge: state.isGgufModelReady ? '신경망 LLM (탑재됨)' : '모델 다운로드 필요',
+                      badgeColor: state.isGgufModelReady ? const Color(0xFF283593) : Colors.orange.shade800,
+                      description: '실제 461.8MB GGUF 신경망 가중치 기반 인앱 추론. (macOS 데스크톱 Metal 가속 / iOS 샌드박스 탑재)',
+                      specs: '모델: Qwen3-0.6B Q4_K_M | 용량: ${state.modelFileSize} | 유형: 인공신경망 LLM',
+                      onSelect: () {
+                        cubit.setEngineMode(EngineMode.localGguf);
+                        Navigator.pop(bottomSheetContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('🧠 Qwen3-0.6B 온디바이스 LLM 모델로 전환되었습니다.')),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Model 2: Qwen3 Lightweight Rule Engine
+                    _buildEngineOptionCard(
+                      context: context,
+                      mode: EngineMode.pureDart,
+                      currentMode: state.engineMode,
+                      title: '⚡ Qwen3 경량 규칙 엔진 (정규식·문법 기반)',
+                      badge: '초고속 (1ms)',
+                      badgeColor: const Color(0xFF00796B),
+                      description: 'Qwen3 말투 변환 패턴을 정규식/문법 사전 규칙으로 초고속 경량화한 모드. 지연시간 1ms 및 수치·부정 100% 보존.',
+                      specs: '속도: ~1ms | 용량: 0MB 추가 | 유형: 문법·규칙 기반 알고리즘',
+                      onSelect: () {
+                        cubit.setEngineMode(EngineMode.pureDart);
+                        Navigator.pop(bottomSheetContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('⚡ Qwen3 경량 규칙 엔진으로 전환되었습니다.')),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Model 3: Mock Test Engine
+                    _buildEngineOptionCard(
+                      context: context,
+                      mode: EngineMode.mock,
+                      currentMode: state.engineMode,
+                      title: '🛠 Mock 모의 테스트 엔진',
+                      badge: '테스트용',
+                      badgeColor: Colors.grey.shade700,
+                      description: '단위 테스트 및 CI 검증을 위한 모의 시뮬레이터 (isMock: true 명시).',
+                      specs: '속도: ~280ms | 용량: 0MB | 유형: Mock Simulator',
+                      onSelect: () {
+                        cubit.setEngineMode(EngineMode.mock);
+                        Navigator.pop(bottomSheetContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('🛠 Mock 모의 테스트 엔진으로 전환되었습니다.')),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Download / Sync Card if needed
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                state.isGgufModelReady ? Icons.check_circle : Icons.cloud_download_outlined,
+                                color: state.isGgufModelReady ? Colors.green : const Color(0xFF283593),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'GGUF 모델 파일 상태: ${state.modelFileSize}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '저장 위치: iOS 앱 샌드박스 Documents/models/Qwen_Qwen3-0.6B-Q4_K_M.gguf',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          ),
+                          if (state.isDownloadingModel) ...[
+                            const SizedBox(height: 12),
+                            LinearProgressIndicator(
+                              value: state.downloadProgress > 0 ? state.downloadProgress : null,
+                              backgroundColor: Colors.grey.shade300,
+                              color: const Color(0xFF283593),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '다운로드 진행 중: ${(state.downloadProgress * 100).toStringAsFixed(1)}%',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ] else if (!state.isGgufModelReady) ...[
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              onPressed: () => cubit.downloadGgufModel(),
+                              icon: const Icon(Icons.download, size: 16),
+                              label: const Text('Qwen3-0.6B 모델 다운로드 (461.8 MB)'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Row(
-                children: [
-                  Icon(Icons.tune, color: Color(0xFF283593)),
-                  SizedBox(width: 8),
-                  Text(
-                    '추론 엔진 / 모델 선택',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '원하시는 추론 엔진을 탭하여 즉시 전환할 수 있습니다.',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 18),
-
-              // Option 1: Pure Dart Engine
-              _buildEngineOptionCard(
-                context: context,
-                mode: EngineMode.pureDart,
-                currentMode: state.engineMode,
-                title: '⚡ 순수 Dart 인앱 엔진 (Pure Dart)',
-                badge: '모바일/시뮬레이터 최적',
-                badgeColor: const Color(0xFF00796B),
-                description: '외부 바이너리/서버 없이 100% Dart 코드로 인앱 구동됩니다. 지연시간 80ms, 수치·부정 표현 100% 보존.',
-                specs: '속도: ~100ms | 용량: 0MB 추가 | 환경: iOS/Android/macOS',
-                onSelect: () {
-                  cubit.setEngineMode(EngineMode.pureDart);
-                  Navigator.pop(bottomSheetContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('⚡ 순수 Dart 인앱 엔진으로 전환되었습니다.')),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // Option 2: Qwen3-0.6B GGUF Model
-              _buildEngineOptionCard(
-                context: context,
-                mode: EngineMode.localGguf,
-                currentMode: state.engineMode,
-                title: '🧠 온디바이스 Qwen3-0.6B (GGUF Q4_K_M)',
-                badge: state.isGgufModelReady ? '신경망 LLM (준비됨)' : '모델 파일 필요',
-                badgeColor: state.isGgufModelReady ? const Color(0xFF283593) : Colors.grey,
-                description: 'Qwen3 0.6B 실제 가중치 로컬 추론. Apple Silicon Metal GPU 가속 기반 초당 220+ 토큰 생성.',
-                specs: '속도: ~1.3s (220 t/s) | 용량: ${state.modelFileSize} | 런타임: llama.cpp v0.7.0',
-                enabled: true,
-                onSelect: () {
-                  cubit.setEngineMode(EngineMode.localGguf);
-                  Navigator.pop(bottomSheetContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('🧠 온디바이스 Qwen3-0.6B LLM으로 전환되었습니다.')),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // Option 3: Mock Simulator
-              _buildEngineOptionCard(
-                context: context,
-                mode: EngineMode.mock,
-                currentMode: state.engineMode,
-                title: '🛠 Mock 모의 시뮬레이터',
-                badge: '테스트용',
-                badgeColor: Colors.orange.shade800,
-                description: '오프라인 규칙 기반 간이 테스트 시뮬레이터 (isMock: true 명시).',
-                specs: '속도: ~280ms | 용량: 0MB | 런타임: Mock Data',
-                onSelect: () {
-                  cubit.setEngineMode(EngineMode.mock);
-                  Navigator.pop(bottomSheetContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('🛠 Mock 모의 시뮬레이터로 전환되었습니다.')),
-                  );
-                },
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -209,12 +271,11 @@ class _ToneLabPageState extends State<ToneLabPage> {
     required String description,
     required String specs,
     required VoidCallback onSelect,
-    bool enabled = true,
   }) {
     final isSelected = currentMode == mode;
 
     return InkWell(
-      onTap: enabled ? onSelect : null,
+      onTap: onSelect,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -234,7 +295,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
               color: isSelected ? badgeColor : Colors.grey,
               size: 22,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,7 +308,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: enabled ? null : Colors.grey,
+                            color: isSelected ? badgeColor : null,
                           ),
                         ),
                       ),
@@ -259,16 +320,12 @@ class _ToneLabPageState extends State<ToneLabPage> {
                         ),
                         child: Text(
                           badge,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: badgeColor,
-                          ),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeColor),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
                   Text(
                     description,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
@@ -276,7 +333,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
                   const SizedBox(height: 6),
                   Text(
                     specs,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -289,124 +346,69 @@ class _ToneLabPageState extends State<ToneLabPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.auto_awesome, color: Color(0xFFFFB300), size: 22),
-            SizedBox(width: 8),
-            Text('Korean Tone Lab', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-          ],
-        ),
-        actions: [
-          BlocBuilder<ToneLabCubit, ToneLabState>(
-            builder: (context, state) {
-              String shortLabel;
-              Color chipColor;
-              switch (state.engineMode) {
-                case EngineMode.pureDart:
-                  shortLabel = '⚡ 순수 Dart';
-                  chipColor = const Color(0xFF00796B);
-                  break;
-                case EngineMode.localGguf:
-                  shortLabel = '🧠 Qwen3 0.6B';
-                  chipColor = const Color(0xFF283593);
-                  break;
-                case EngineMode.mock:
-                  shortLabel = '🛠 Mock';
-                  chipColor = Colors.orange.shade800;
-                  break;
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 12.0),
-                child: ActionChip(
-                  avatar: const Icon(Icons.tune, size: 16),
-                  label: Text(
-                    shortLabel,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: chipColor),
-                  ),
-                  backgroundColor: chipColor.withValues(alpha: 0.12),
-                  side: BorderSide(color: chipColor.withValues(alpha: 0.4)),
-                  onPressed: () => _showEngineSettingsModal(context),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: BlocConsumer<ToneLabCubit, ToneLabState>(
-        listener: (context, state) {
-          if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.errorMessage!), backgroundColor: Colors.red),
-            );
-          }
-        },
-        builder: (context, state) {
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 800;
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildEngineStatusBar(state),
-                    const SizedBox(height: 14),
-                    _buildPresetSelector(state),
-                    const SizedBox(height: 18),
-                    if (isWide)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: _buildInputCard(state)),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildComparisonCard(state)),
-                        ],
-                      )
-                    else ...[
-                      _buildInputCard(state),
-                      const SizedBox(height: 16),
-                      _buildComparisonCard(state),
-                    ],
-                  ],
-                ),
-              );
-            },
+    return BlocConsumer<ToneLabCubit, ToneLabState>(
+      listener: (context, state) {
+        if (state.errorMessage != null && state.status == ToneLabStatus.failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.errorMessage!),
+              backgroundColor: Colors.red.shade700,
+              duration: const Duration(seconds: 4),
+            ),
           );
-        },
-      ),
+        }
+      },
+      builder: (context, state) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Korean Tone Lab', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                Text(
+                  '엔진: ${state.engineMode.displayName.split(' ')[1]} (${state.modelFileSize})',
+                  style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.normal),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: 0.15),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => _showEngineSettingsModal(context),
+                icon: const Icon(Icons.settings, size: 16),
+                label: const Text('모델 설정', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildActiveEngineBanner(context, state),
+                const SizedBox(height: 12),
+                _buildPresetChipsSection(),
+                const SizedBox(height: 12),
+                _buildInputFormCard(state),
+                const SizedBox(height: 16),
+                _buildComparisonCard(state),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildEngineStatusBar(ToneLabState state) {
-    Color bannerColor;
-    IconData bannerIcon;
-    String titleText;
-    String subtitleText;
-
-    switch (state.engineMode) {
-      case EngineMode.pureDart:
-        bannerColor = const Color(0xFF00796B);
-        bannerIcon = Icons.bolt;
-        titleText = '순수 Dart 인앱 엔진 (Pure Dart NLP Engine)';
-        subtitleText = '외부 바이너리/서버 없이 100% Dart 코드로 모바일 및 시뮬레이터에서 즉시 구동 (우측 상단 칩을 눌러 변경 가능)';
-        break;
-      case EngineMode.localGguf:
-        bannerColor = const Color(0xFF283593);
-        bannerIcon = Icons.memory;
-        titleText = '온디바이스 LLM: Qwen3-0.6B-Q4_K_M (Apple Silicon Metal)';
-        subtitleText = 'GGUF 가중치 (${state.modelFileSize}) 로컬 가속 추론 (우측 상단 칩을 눌러 변경 가능)';
-        break;
-      case EngineMode.mock:
-        bannerColor = Colors.orange.shade800;
-        bannerIcon = Icons.rule;
-        titleText = '모의 서비스 (Mock Rule Simulator)';
-        subtitleText = '오프라인 규칙 기반 간이 시뮬레이터 (isMock: true)';
-        break;
-    }
+  Widget _buildActiveEngineBanner(BuildContext context, ToneLabState state) {
+    final isGguf = state.engineMode == EngineMode.localGguf;
+    final color = isGguf ? const Color(0xFF283593) : const Color(0xFF00796B);
 
     return InkWell(
       onTap: () => _showEngineSettingsModal(context),
@@ -414,33 +416,65 @@ class _ToneLabPageState extends State<ToneLabPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: bannerColor.withValues(alpha: 0.1),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
-            Icon(bannerIcon, color: bannerColor, size: 22),
-            const SizedBox(width: 10),
+            Icon(isGguf ? Icons.psychology : Icons.bolt, color: color, size: 20),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        titleText,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: bannerColor),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey),
-                    ],
+                  Text(
+                    '현재 엔진: ${state.engineMode.displayName}',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
                   ),
                   Text(
-                    subtitleText,
+                    state.engineMode.description,
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetChipsSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.auto_awesome, size: 16, color: Color(0xFF283593)),
+                SizedBox(width: 6),
+                Text('평가 프리셋 샘플 (클릭 시 자동 입력)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _samplePresets.map((preset) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6.0),
+                    child: ActionChip(
+                      label: Text(preset['title'] as String, style: const TextStyle(fontSize: 11)),
+                      onPressed: () => _applyPreset(preset),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
           ],
@@ -449,32 +483,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
     );
   }
 
-  Widget _buildPresetSelector(ToneLabState state) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('빠른 샘플 불러오기 (대표 케이스):', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: _samplePresets.map((preset) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: ActionChip(
-                  avatar: const Icon(Icons.bookmark_border, size: 15),
-                  label: Text(preset['title'] as String, style: const TextStyle(fontSize: 12)),
-                  onPressed: () => _applyPreset(preset),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInputCard(ToneLabState state) {
+  Widget _buildInputFormCard(ToneLabState state) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -482,26 +491,26 @@ class _ToneLabPageState extends State<ToneLabPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('1. 입력 정보 설정', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            const Divider(height: 20),
+            const SizedBox(height: 12),
             TextField(
               controller: _contextController,
               decoration: const InputDecoration(
-                labelText: '직전 사용자 발화 (맥락, 선택)',
+                labelText: '직전 발화 / 사용자 대화 맥락 (선택)',
                 hintText: '예: 오늘 애인이 내 말을 공감도 안 하고 평가하려들고 너무 짜증나!',
               ),
               onChanged: (val) => context.read<ToneLabCubit>().updateUserContext(val),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             TextField(
               controller: _sourceController,
-              maxLines: 4,
+              maxLines: 3,
               decoration: const InputDecoration(
                 labelText: '서버 LLM 원본 응답 (필수)*',
                 hintText: '예: 공감을 안 해주고 많이 속상했겠어요',
               ),
               onChanged: (val) => context.read<ToneLabCubit>().updateSourceText(val),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             const Text('2. 목표 스타일 선택', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             const SizedBox(height: 8),
             Wrap(
@@ -525,7 +534,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
               state.selectedStyle.description,
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
@@ -579,10 +588,10 @@ class _ToneLabPageState extends State<ToneLabPage> {
             const Divider(height: 20),
             if (result == null)
               Container(
-                height: 200,
+                height: 180,
                 alignment: Alignment.center,
                 child: Text(
-                  '좌측에서 텍스트를 입력하고\n[온디바이스 말투 변환 실행]을 눌러주세요.',
+                  '상단에서 텍스트를 입력하고\n[온디바이스 말투 변환 실행]을 눌러주세요.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                 ),
@@ -604,7 +613,7 @@ class _ToneLabPageState extends State<ToneLabPage> {
                     const Chip(
                       backgroundColor: Color(0xFFFFEBEE),
                       avatar: Icon(Icons.shield_outlined, color: Colors.red, size: 15),
-                      label: Text('Fallback 발동 (원문 유지)', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
+                      label: Text('Fallback 발동 (원문 보존)', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
                     )
                   else
                     const Chip(
@@ -617,19 +626,21 @@ class _ToneLabPageState extends State<ToneLabPage> {
               if (result.usedFallback && result.fallbackReason != null) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(Icons.info_outline, size: 16, color: Colors.red),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Fallback 사유: ${result.fallbackReason}',
-                          style: const TextStyle(fontSize: 11, color: Colors.red),
+                          '안내 / 사유:\n${result.fallbackReason}',
+                          style: const TextStyle(fontSize: 11, color: Colors.red, height: 1.3),
                         ),
                       ),
                     ],

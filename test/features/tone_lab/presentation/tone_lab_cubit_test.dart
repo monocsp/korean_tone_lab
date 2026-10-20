@@ -7,6 +7,8 @@ import 'package:korean_tone_lab/features/tone_lab/presentation/cubit/tone_lab_cu
 import 'package:korean_tone_lab/features/tone_lab/presentation/cubit/tone_lab_state.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late ToneLabCubit cubit;
   late PureDartToneRewriteService pureDartService;
   late MockToneRewriteService mockService;

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/model_manager.dart';
 import '../../domain/tone_rewrite_request.dart';
@@ -26,13 +26,17 @@ class ToneLabCubit extends Cubit<ToneLabState> {
   }
 
   Future<void> _initEngine() async {
-    final ggufAvailable = _modelManager.isModelAvailable();
-    final size = _modelManager.getFormattedFileSize();
+    // 1. Sync model from host project to sandbox if running on simulator
+    await _modelManager.syncModelToSandboxIfAvailable();
+    if (isClosed) return;
 
-    // Default to Pure Dart engine on iOS / mobile simulator for 100% in-app stability
-    final defaultEngine = (Platform.isIOS || Platform.isAndroid || !ggufAvailable)
-        ? EngineMode.pureDart
-        : EngineMode.localGguf;
+    // 2. Check model availability
+    final ggufAvailable = await _modelManager.checkModelAvailable();
+    final size = await _modelManager.getFormattedFileSizeAsync();
+    if (isClosed) return;
+
+    // If Qwen3 GGUF model is available, default to Qwen3 Neural LLM; otherwise lightweight rule engine
+    final defaultEngine = ggufAvailable ? EngineMode.localGguf : EngineMode.pureDart;
 
     emit(state.copyWith(
       isGgufModelReady: ggufAvailable,
@@ -41,12 +45,59 @@ class ToneLabCubit extends Cubit<ToneLabState> {
     ));
 
     await _pureDartService.initialize();
+    if (isClosed) return;
 
-    if (ggufAvailable && (Platform.isMacOS || Platform.isLinux)) {
+    if (ggufAvailable) {
       try {
         await _localGgufService.initialize();
-      } catch (_) {
-        emit(state.copyWith(engineMode: EngineMode.pureDart));
+      } catch (e) {
+        debugPrint('[ToneLabCubit] GGUF service init exception: $e');
+        if (!isClosed) {
+          emit(state.copyWith(engineMode: EngineMode.pureDart));
+        }
+      }
+    }
+  }
+
+  /// Downloads the Qwen3-0.6B GGUF model directly inside the app.
+  Future<void> downloadGgufModel() async {
+    if (state.isDownloadingModel || isClosed) return;
+
+    emit(state.copyWith(
+      isDownloadingModel: true,
+      downloadProgress: 0.0,
+      errorMessage: null,
+    ));
+
+    try {
+      await _modelManager.downloadModel(
+        onProgress: (progress) {
+          if (!isClosed) {
+            emit(state.copyWith(downloadProgress: progress));
+          }
+        },
+      );
+
+      final ggufAvailable = await _modelManager.checkModelAvailable();
+      final size = await _modelManager.getFormattedFileSizeAsync();
+
+      await _localGgufService.initialize();
+
+      if (!isClosed) {
+        emit(state.copyWith(
+          isDownloadingModel: false,
+          downloadProgress: 1.0,
+          isGgufModelReady: ggufAvailable,
+          modelFileSize: size,
+          engineMode: EngineMode.localGguf,
+        ));
+      }
+    } catch (e) {
+      if (!isClosed) {
+        emit(state.copyWith(
+          isDownloadingModel: false,
+          errorMessage: '모델 다운로드 실패: $e',
+        ));
       }
     }
   }
@@ -58,7 +109,6 @@ class ToneLabCubit extends Cubit<ToneLabState> {
   }
 
   void updateSourceText(String text) {
-    // When user manually types, dynamically extract facts from their actual input
     final dynamicFacts = _extractFacts(text);
     emit(state.copyWith(
       sourceText: text,
@@ -115,11 +165,11 @@ class ToneLabCubit extends Cubit<ToneLabState> {
     try {
       ToneRewriteService activeService;
       switch (state.engineMode) {
-        case EngineMode.pureDart:
-          activeService = _pureDartService;
-          break;
         case EngineMode.localGguf:
           activeService = _localGgufService;
+          break;
+        case EngineMode.pureDart:
+          activeService = _pureDartService;
           break;
         case EngineMode.mock:
           activeService = _mockService;
@@ -128,15 +178,19 @@ class ToneLabCubit extends Cubit<ToneLabState> {
 
       final result = await activeService.rewrite(request);
 
-      emit(state.copyWith(
-        status: ToneLabStatus.success,
-        result: result,
-      ));
+      if (!isClosed) {
+        emit(state.copyWith(
+          status: ToneLabStatus.success,
+          result: result,
+        ));
+      }
     } catch (e) {
-      emit(state.copyWith(
-        status: ToneLabStatus.failure,
-        errorMessage: e.toString(),
-      ));
+      if (!isClosed) {
+        emit(state.copyWith(
+          status: ToneLabStatus.failure,
+          errorMessage: e.toString(),
+        ));
+      }
     }
   }
 
