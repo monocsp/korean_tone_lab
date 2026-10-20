@@ -4,6 +4,7 @@ import 'core/model_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'features/tone_lab/data/local_tone_rewrite_service.dart';
 import 'features/tone_lab/data/mock_tone_rewrite_service.dart';
+import 'features/tone_lab/data/pure_dart_tone_rewrite_service.dart';
 import 'features/tone_lab/presentation/cubit/tone_lab_cubit.dart';
 import 'features/tone_lab/presentation/pages/tone_lab_page.dart';
 
@@ -18,12 +19,14 @@ class KoreanToneLabApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final modelManager = ModelManager();
-    final localService = LocalToneRewriteService(modelManager: modelManager);
+    final pureDartService = PureDartToneRewriteService();
+    final localGgufService = LocalToneRewriteService(modelManager: modelManager);
     final mockService = MockToneRewriteService();
 
     return BlocProvider(
       create: (context) => ToneLabCubit(
-        localService: localService,
+        pureDartService: pureDartService,
+        localGgufService: localGgufService,
         mockService: mockService,
         modelManager: modelManager,
       ),

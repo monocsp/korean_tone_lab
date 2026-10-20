@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/model_manager.dart';
 import '../../domain/tone_rewrite_request.dart';
@@ -6,15 +7,18 @@ import '../../domain/tone_style.dart';
 import 'tone_lab_state.dart';
 
 class ToneLabCubit extends Cubit<ToneLabState> {
-  final ToneRewriteService _localService;
+  final ToneRewriteService _pureDartService;
+  final ToneRewriteService _localGgufService;
   final ToneRewriteService _mockService;
   final ModelManager _modelManager;
 
   ToneLabCubit({
-    required ToneRewriteService localService,
+    required ToneRewriteService pureDartService,
+    required ToneRewriteService localGgufService,
     required ToneRewriteService mockService,
     required ModelManager modelManager,
-  })  : _localService = localService,
+  })  : _pureDartService = pureDartService,
+        _localGgufService = localGgufService,
         _mockService = mockService,
         _modelManager = modelManager,
         super(const ToneLabState()) {
@@ -22,20 +26,27 @@ class ToneLabCubit extends Cubit<ToneLabState> {
   }
 
   Future<void> _initEngine() async {
-    final available = _modelManager.isModelAvailable();
+    final ggufAvailable = _modelManager.isModelAvailable();
     final size = _modelManager.getFormattedFileSize();
+
+    // Default to Pure Dart engine on iOS / mobile simulator for 100% in-app stability
+    final defaultEngine = (Platform.isIOS || Platform.isAndroid || !ggufAvailable)
+        ? EngineMode.pureDart
+        : EngineMode.localGguf;
+
     emit(state.copyWith(
-      isModelReady: available,
+      isGgufModelReady: ggufAvailable,
       modelFileSize: size,
-      useMockEngine: !available, // Default to mock only if local model file is absent
+      engineMode: defaultEngine,
     ));
 
-    if (available) {
+    await _pureDartService.initialize();
+
+    if (ggufAvailable && (Platform.isMacOS || Platform.isLinux)) {
       try {
-        await _localService.initialize();
+        await _localGgufService.initialize();
       } catch (_) {
-        // Fallback to mock on init failure
-        emit(state.copyWith(useMockEngine: true));
+        emit(state.copyWith(engineMode: EngineMode.pureDart));
       }
     }
   }
@@ -52,8 +63,8 @@ class ToneLabCubit extends Cubit<ToneLabState> {
     emit(state.copyWith(selectedStyle: style));
   }
 
-  void toggleEngine(bool useMock) {
-    emit(state.copyWith(useMockEngine: useMock));
+  void setEngineMode(EngineMode mode) {
+    emit(state.copyWith(engineMode: mode));
   }
 
   void loadSample({
@@ -89,8 +100,20 @@ class ToneLabCubit extends Cubit<ToneLabState> {
     );
 
     try {
-      final service = state.useMockEngine ? _mockService : _localService;
-      final result = await service.rewrite(request);
+      ToneRewriteService activeService;
+      switch (state.engineMode) {
+        case EngineMode.pureDart:
+          activeService = _pureDartService;
+          break;
+        case EngineMode.localGguf:
+          activeService = _localGgufService;
+          break;
+        case EngineMode.mock:
+          activeService = _mockService;
+          break;
+      }
+
+      final result = await activeService.rewrite(request);
 
       emit(state.copyWith(
         status: ToneLabStatus.success,
@@ -106,7 +129,8 @@ class ToneLabCubit extends Cubit<ToneLabState> {
 
   @override
   Future<void> close() async {
-    await _localService.dispose();
+    await _pureDartService.dispose();
+    await _localGgufService.dispose();
     await _mockService.dispose();
     return super.close();
   }
